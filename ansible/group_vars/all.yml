@@ -1,0 +1,21 @@
+---
+# Application metadata
+app_name: travel-insurance-claim-system
+app_version: '1.0.0'
+app_port: 8081
+app_jar: "travel-insurance-claim-system-{{ app_version }}.jar"
+
+# Directory paths
+deploy_dir: /opt/travel-insurance
+backup_dir: /opt/travel-insurance/backups
+log_dir: /var/log/travel-insurance
+
+# Runtime prerequisites
+java_package: openjdk-21-jre-headless
+system_user: devops
+system_group: devops
+
+# Health Check Settings
+health_check_url: "http://localhost:{{ app_port }}/index.html"
+health_check_retries: 6
+health_check_delay: 5

@@ -1,0 +1,97 @@
+---
+- name: Deploy Travel Insurance Claim System
+  hosts: app_servers
+  become: yes
+
+  tasks:
+    - name: Ensure Java 21 runtime is installed
+      apt:
+        name: "{{ java_package }}"
+        state: present
+        update_cache: yes
+      tags: [prerequisites]
+
+    - name: Ensure deployment group exists
+      group:
+        name: "{{ system_group }}"
+        state: present
+      tags: [setup]
+
+    - name: Ensure deployment user exists
+      user:
+        name: "{{ system_user }}"
+        group: "{{ system_group }}"
+        home: "{{ deploy_dir }}"
+        shell: /bin/bash
+        system: yes
+        state: present
+      tags: [setup]
+
+    - name: Ensure application, backup, and log directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ system_user }}"
+        group: "{{ system_group }}"
+        mode: '0755'
+      loop:
+        - "{{ deploy_dir }}"
+        - "{{ backup_dir }}"
+        - "{{ log_dir }}"
+      tags: [setup]
+
+    - name: Backup existing application JAR if present
+      copy:
+        src: "{{ deploy_dir }}/app.jar"
+        dest: "{{ backup_dir }}/app-backup-{{ ansible_date_time.iso8601_basic }}.jar"
+        remote_src: yes
+      ignore_errors: yes
+      tags: [backup]
+
+    - name: Deploy application JAR artifact
+      copy:
+        src: "../../travel-insurance-claim-system/target/{{ app_jar }}"
+        dest: "{{ deploy_dir }}/app.jar"
+        owner: "{{ system_user }}"
+        group: "{{ system_group }}"
+        mode: '0644'
+      notify: Restart Travel Insurance Service
+      tags: [deploy]
+
+    - name: Deploy systemd service configuration
+      template:
+        src: ../templates/app.service.j2
+        dest: /etc/systemd/system/travel-insurance.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Reload Systemd Daemon
+      tags: [deploy]
+
+    - name: Enable and ensure service is active
+      systemd:
+        name: travel-insurance
+        enabled: yes
+        state: started
+      tags: [deploy]
+
+    - name: Validate service availability with HTTP health check
+      uri:
+        url: "{{ health_check_url }}"
+        method: GET
+        status_code: 200
+      register: health_result
+      retries: "{{ health_check_retries }}"
+      delay: "{{ health_check_delay }}"
+      until: health_result.status == 200
+      tags: [verify]
+
+  handlers:
+    - name: Reload Systemd Daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Restart Travel Insurance Service
+      systemd:
+        name: travel-insurance
+        state: restarted

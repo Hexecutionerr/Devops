@@ -1,0 +1,16 @@
+---
+- name: Verify Health of Travel Insurance Claim System
+  hosts: app_servers
+  gather_facts: no
+
+  tasks:
+    - name: Perform HTTP GET on Customer Portal
+      uri:
+        url: "{{ health_check_url }}"
+        method: GET
+        status_code: 200
+      register: result
+
+    - name: Display health check confirmation
+      debug:
+        msg: "Service is HEALTHY on port {{ app_port }}. Status Code: {{ result.status }}"

@@ -1,49 +1,37 @@
-HELP.md
+# Build targets and binaries
 target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-
-### STS / Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+**/target/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
+**/build/
+*.jar
+*.war
 
-### VS Code ###
-.vscode/
-
-### OS ###
-.DS_Store
-Thumbs.db
-
-### Logs ###
-*.log
-logs/
-
-### Temporary / Local files ###
+# Uploads and temporary files
+uploads/
+**/uploads/
 *.tmp
 *.bak
 *.swp
-.env
-local.properties
-uploads/
+*.log
+**/logs/
+
+# IDE and Editor files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+.sts4-cache/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+*$py.class

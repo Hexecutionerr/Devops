@@ -1,0 +1,18 @@
+[Unit]
+Description=Travel Insurance Claim System Spring Boot Service
+After=network.target
+
+[Service]
+Type=simple
+User={{ system_user }}
+Group={{ system_group }}
+WorkingDirectory={{ deploy_dir }}
+ExecStart=/usr/bin/java -Djava.security.egd=file:/dev/./urandom -jar {{ deploy_dir }}/app.jar --server.port={{ app_port }}
+Restart=always
+RestartSec=10
+SuccessExitStatus=143
+StandardOutput=append:{{ log_dir }}/app.log
+StandardError=append:{{ log_dir }}/error.log
+
+[Install]
+WantedBy=multi-user.target

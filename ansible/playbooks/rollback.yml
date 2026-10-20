@@ -1,0 +1,53 @@
+---
+- name: Rollback Travel Insurance Claim System to Previous Version
+  hosts: app_servers
+  become: yes
+
+  tasks:
+    - name: Identify latest backup JAR artifact
+      find:
+        paths: "{{ backup_dir }}"
+        patterns: "app-backup-*.jar"
+      register: found_backups
+
+    - name: Assert backup existence
+      fail:
+        msg: "No previous backup artifact available in {{ backup_dir }}."
+      when: found_backups.matched == 0
+
+    - name: Determine latest backup file path
+      set_fact:
+        latest_backup: "{{ (found_backups.files | sort(attribute='mtime') | last).path }}"
+
+    - name: Stop running service before rollback
+      systemd:
+        name: travel-insurance
+        state: stopped
+
+    - name: Restore JAR from backup
+      copy:
+        src: "{{ latest_backup }}"
+        dest: "{{ deploy_dir }}/app.jar"
+        remote_src: yes
+        owner: "{{ system_user }}"
+        group: "{{ system_group }}"
+        mode: '0644'
+
+    - name: Restart service with restored artifact
+      systemd:
+        name: travel-insurance
+        state: started
+
+    - name: Verify restored service health
+      uri:
+        url: "{{ health_check_url }}"
+        method: GET
+        status_code: 200
+      register: rollback_check
+      retries: "{{ health_check_retries }}"
+      delay: "{{ health_check_delay }}"
+      until: rollback_check.status == 200
+
+    - name: Confirm successful rollback
+      debug:
+        msg: "Rollback SUCCEEDED. Service restored from {{ latest_backup }}."
