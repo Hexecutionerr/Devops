@@ -1,6 +1,7 @@
 package com.academic.travelinsurance.dto;
 
 import jakarta.validation.constraints.*;
+import org.springframework.format.annotation.DateTimeFormat;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -20,6 +21,7 @@ public class ClaimSubmitRequest {
     private String destination;
 
     @NotNull(message = "Travel date is required")
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate travelDate;
 
     @NotBlank(message = "Claim type is required")

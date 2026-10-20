@@ -46,6 +46,35 @@ function formatDateTime(isoString) {
     return d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+/* ---------- Utility: Format File Size ---------- */
+function formatFileSize(bytes) {
+    if (!bytes || isNaN(bytes)) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+/* ---------- Utility: File Icon ---------- */
+function getFileIcon(fileName) {
+    const lower = (fileName || '').toLowerCase();
+    if (lower.endsWith('.pdf')) return '📕';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png')) return '🖼️';
+    if (lower.endsWith('.doc') || lower.endsWith('.docx')) return '📘';
+    return '📄';
+}
+
+/* ---------- Utility: HTML Escaping ---------- */
+function escapeHtml(str) {
+    if (!str) return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+
 
 /* =========================================================
    LOAD PENDING CLAIMS
@@ -146,7 +175,77 @@ function populateReviewDetails(claim) {
     document.getElementById('r-documentReference').textContent= claim.documentReference;
     document.getElementById('r-createdAt').textContent        = formatDateTime(claim.createdAt);
     document.getElementById('r-updatedAt').textContent        = formatDateTime(claim.updatedAt);
+
+    // Load and render uploaded documents
+    renderReviewerDocuments(claim);
 }
+
+/* ---------- Render Clickable Uploaded Documents ---------- */
+async function renderReviewerDocuments(claim) {
+    const uploadedBox = document.getElementById('r-uploadedFilesBox');
+    const container = document.getElementById('r-uploadedFiles');
+    if (!uploadedBox || !container) return;
+
+    container.innerHTML = '<span style="color:#6c757d;font-style:italic;font-size:0.85rem;">Loading documents...</span>';
+    uploadedBox.style.display = 'block';
+
+    try {
+        const response = await fetch(`/api/documents/claim/${claim.claimId}`);
+        if (response.ok) {
+            const docs = await response.json();
+            if (Array.isArray(docs) && docs.length > 0) {
+                container.innerHTML = `
+                    <div class="doc-card-list">
+                        ${docs.map(doc => `
+                            <div class="doc-card-item">
+                                <div class="doc-card-left">
+                                    <span class="doc-card-icon">${getFileIcon(doc.fileName)}</span>
+                                    <a href="${doc.viewUrl}" target="_blank" rel="noopener noreferrer" class="doc-card-filename" title="Open ${escapeHtml(doc.fileName)} in new tab">
+                                        ${escapeHtml(doc.fileName)}
+                                    </a>
+                                    <span class="doc-card-size">${formatFileSize(doc.fileSize)}</span>
+                                </div>
+                                <div class="doc-card-actions">
+                                    <a href="${doc.viewUrl}" target="_blank" rel="noopener noreferrer" class="btn-doc-action btn-doc-view" title="View ${escapeHtml(doc.fileName)} in new tab">
+                                        👁️ View
+                                    </a>
+                                    <a href="${doc.downloadUrl}" class="btn-doc-action btn-doc-download" download="${escapeHtml(doc.fileName)}" title="Download ${escapeHtml(doc.fileName)}">
+                                        📥 Download
+                                    </a>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                return;
+            }
+        }
+    } catch (err) {
+        console.warn('Could not fetch structured documents for claim ' + claim.claimId, err);
+    }
+
+    // Fallback: If claim has uploadedFiles text but no binary records
+    if (claim.uploadedFiles && claim.uploadedFiles.trim() !== '') {
+        const names = claim.uploadedFiles.split(',').map(s => s.trim()).filter(Boolean);
+        container.innerHTML = `
+            <div class="doc-card-list">
+                ${names.map(name => `
+                    <div class="doc-card-item">
+                        <div class="doc-card-left">
+                            <span class="doc-card-icon">${getFileIcon(name)}</span>
+                            <span class="doc-card-filename" style="cursor:default;color:#555;">${escapeHtml(name)}</span>
+                        </div>
+                        <span class="doc-card-size">Filename record</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        uploadedBox.style.display = 'none';
+        container.innerHTML = '';
+    }
+}
+
 
 /* ---------- Disable action buttons if claim is already decided ---------- */
 function resetActionButtons(status) {

@@ -18,10 +18,12 @@ import java.util.List;
 public class ClaimService {
 
     private final ClaimRepository claimRepository;
+    private final DocumentService documentService;
 
     // Constructor injection (preferred over @Autowired field injection)
-    public ClaimService(ClaimRepository claimRepository) {
+    public ClaimService(ClaimRepository claimRepository, DocumentService documentService) {
         this.claimRepository = claimRepository;
+        this.documentService = documentService;
     }
 
     /**
@@ -32,6 +34,18 @@ public class ClaimService {
      * @return saved Claim entity with generated ID
      */
     public Claim submitClaim(ClaimSubmitRequest request) {
+        return submitClaimWithFiles(request, null);
+    }
+
+    /**
+     * Accepts validated claim data and optional uploaded files.
+     * Maps to entity, persists file names in uploadedFiles, stores documents, and saves the claim.
+     *
+     * @param request DTO containing claim data from the customer
+     * @param files   optional list of uploaded files
+     * @return saved Claim entity with generated ID
+     */
+    public Claim submitClaimWithFiles(ClaimSubmitRequest request, List<org.springframework.web.multipart.MultipartFile> files) {
         Claim claim = new Claim();
         claim.setPolicyNumber(request.getPolicyNumber());
         claim.setCustomerName(request.getCustomerName());
@@ -43,8 +57,35 @@ public class ClaimService {
         claim.setDocumentReference(request.getDocumentReference());
         claim.setStatus(ClaimStatus.PENDING); // Always starts as PENDING
 
-        return claimRepository.save(claim);
+        if (files != null && !files.isEmpty()) {
+            List<String> fileNames = files.stream()
+                    .filter(f -> f != null && !f.isEmpty())
+                    .map(org.springframework.web.multipart.MultipartFile::getOriginalFilename)
+                    .filter(name -> name != null && !name.trim().isEmpty())
+                    .toList();
+            if (!fileNames.isEmpty()) {
+                claim.setUploadedFiles(String.join(", ", fileNames));
+            }
+        }
+
+        Claim savedClaim = claimRepository.save(claim);
+
+        // Store the actual document content and metadata
+        if (files != null && !files.isEmpty() && documentService != null) {
+            for (org.springframework.web.multipart.MultipartFile file : files) {
+                if (file != null && !file.isEmpty()) {
+                    try {
+                        documentService.saveDocument(savedClaim.getClaimId(), file);
+                    } catch (Exception e) {
+                        System.err.println("Failed to save document: " + file.getOriginalFilename() + " - " + e.getMessage());
+                    }
+                }
+            }
+        }
+
+        return savedClaim;
     }
+
 
     /**
      * Retrieves a claim by its unique ID.

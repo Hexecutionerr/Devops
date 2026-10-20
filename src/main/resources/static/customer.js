@@ -1,9 +1,17 @@
-﻿/* =========================================================
+/* =========================================================
    customer.js — Customer Portal JavaScript
-   Handles: Claim Submission, Tab Navigation, Claim Tracking
+   Handles: Claim Submission, Tab Navigation, Claim Tracking,
+            Document Upload with Drag & Drop
    ========================================================= */
 
 const API_BASE = '/api';
+
+// Supported document upload configuration
+const ALLOWED_EXTENSIONS = ['.pdf', '.jpeg', '.jpg', '.png', '.doc', '.docx'];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+// In-memory list of selected files
+let selectedFiles = [];
 
 /* ---------- Tab Navigation ---------- */
 function showTab(tabId, btn) {
@@ -16,6 +24,7 @@ function showTab(tabId, btn) {
 /* ---------- Utility: Show message ---------- */
 function showMsg(elementId, message, type) {
     const el = document.getElementById(elementId);
+    if (!el) return;
     el.className = `msg msg-${type} show`;
     el.innerHTML = message;
 }
@@ -23,6 +32,7 @@ function showMsg(elementId, message, type) {
 /* ---------- Utility: Hide message ---------- */
 function hideMsg(elementId) {
     const el = document.getElementById(elementId);
+    if (!el) return;
     el.className = 'msg';
     el.innerHTML = '';
 }
@@ -44,11 +54,40 @@ function formatDateTime(isoString) {
     return d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+/* ---------- Utility: Format File Size ---------- */
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+/* ---------- Utility: File Icon ---------- */
+function getFileIcon(fileName) {
+    const lower = (fileName || '').toLowerCase();
+    if (lower.endsWith('.pdf')) return '📕';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png')) return '🖼️';
+    if (lower.endsWith('.doc') || lower.endsWith('.docx')) return '📘';
+    return '📄';
+}
+
+/* ---------- Utility: HTML Escaping ---------- */
+function escapeHtml(str) {
+    if (!str) return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 /* ---------- Clear submit result ---------- */
 function clearSubmitResult() {
     hideMsg('submitResult');
-    document.getElementById('claimIdBox').style.display = 'none';
+    const claimIdBox = document.getElementById('claimIdBox');
+    if (claimIdBox) claimIdBox.style.display = 'none';
     clearAllFieldErrors();
+    clearSelectedFiles();
 }
 
 /* =========================================================
@@ -96,9 +135,6 @@ function clearAllFieldErrors() {
 /**
  * Run client-side validation on the claim submission form.
  * Returns true if valid, false otherwise (and shows per-field errors).
- *
- * NOTE: Backend validation is the final authority.
- * This is a convenience layer only — it does not replace server-side checks.
  */
 function validateClaimForm(payload) {
     let valid = true;
@@ -141,6 +177,172 @@ function validateClaimForm(payload) {
 }
 
 /* =========================================================
+   DOCUMENT UPLOAD FUNCTIONALITY
+   ========================================================= */
+
+function showUploadError(message) {
+    const errEl = document.getElementById('fileUploadError');
+    if (!errEl) return;
+    errEl.innerHTML = message;
+    errEl.style.display = 'block';
+}
+
+function clearUploadError() {
+    const errEl = document.getElementById('fileUploadError');
+    if (!errEl) return;
+    errEl.innerHTML = '';
+    errEl.style.display = 'none';
+}
+
+/**
+ * Initialize file upload zone: click, keyboard, drag-and-drop, change events.
+ */
+function initUploadZone() {
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('documentFiles');
+
+    if (!uploadZone || !fileInput) return;
+
+    // 1. Click anywhere on upload area opens native file picker
+    uploadZone.addEventListener('click', function(e) {
+        if (e.target === fileInput) return;
+        fileInput.click();
+    });
+
+    // 2. Keyboard accessibility: Enter or Space triggers file picker
+    uploadZone.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fileInput.click();
+        }
+    });
+
+    // 3. Prevent duplicate dialogs if click propagates
+    fileInput.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+
+    // 4. File selection via native file picker
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files && e.target.files.length > 0) {
+            handleSelectedFiles(e.target.files);
+        }
+        // Reset fileInput value so the same file can be re-selected if removed
+        fileInput.value = '';
+    });
+
+    // 5. Drag and Drop events
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadZone.classList.add('drag-over');
+        });
+    });
+
+    ['dragleave', 'dragend'].forEach(eventName => {
+        uploadZone.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadZone.classList.remove('drag-over');
+        });
+    });
+
+    uploadZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadZone.classList.remove('drag-over');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleSelectedFiles(e.dataTransfer.files);
+        }
+    });
+}
+
+/**
+ * Validate and add files to selectedFiles list.
+ */
+function handleSelectedFiles(fileList) {
+    clearUploadError();
+    const errorMessages = [];
+
+    Array.from(fileList).forEach(file => {
+        const lowerName = file.name.toLowerCase();
+        const hasValidExt = ALLOWED_EXTENSIONS.some(ext => lowerName.endsWith(ext));
+
+        // Format validation
+        if (!hasValidExt) {
+            errorMessages.push(`⚠️ "${escapeHtml(file.name)}": Unsupported format. Allowed: PDF, JPEG, JPG, PNG, DOC, DOCX.`);
+            return;
+        }
+
+        // Size validation (Max 5 MB)
+        if (file.size > MAX_FILE_SIZE) {
+            errorMessages.push(`⚠️ "${escapeHtml(file.name)}": Exceeds 5 MB limit (${formatFileSize(file.size)}).`);
+            return;
+        }
+
+        // Prevent duplicate file addition (same name and size)
+        const isDuplicate = selectedFiles.some(f => f.name === file.name && f.size === file.size);
+        if (!isDuplicate) {
+            selectedFiles.push(file);
+        }
+    });
+
+    if (errorMessages.length > 0) {
+        showUploadError(errorMessages.join('<br>'));
+    }
+
+    renderFilePreview();
+}
+
+/**
+ * Render selected files list below the upload zone with remove buttons.
+ */
+function renderFilePreview() {
+    const previewList = document.getElementById('filePreviewList');
+    if (!previewList) return;
+
+    if (selectedFiles.length === 0) {
+        previewList.innerHTML = '';
+        return;
+    }
+
+    previewList.innerHTML = selectedFiles.map((file, idx) => `
+        <div class="file-preview-item" id="file-item-${idx}">
+            <div class="file-preview-info">
+                <span class="file-preview-icon">${getFileIcon(file.name)}</span>
+                <span class="file-preview-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
+                <span class="file-preview-size">(${formatFileSize(file.size)})</span>
+            </div>
+            <button type="button" class="btn-remove-file" onclick="removeFile(${idx})" title="Remove file" aria-label="Remove ${escapeHtml(file.name)}">
+                ✕
+            </button>
+        </div>
+    `).join('');
+}
+
+/**
+ * Remove an individual file from the selected list.
+ */
+function removeFile(index) {
+    if (index >= 0 && index < selectedFiles.length) {
+        selectedFiles.splice(index, 1);
+        renderFilePreview();
+    }
+}
+
+/**
+ * Clear all selected files and preview.
+ */
+function clearSelectedFiles() {
+    selectedFiles = [];
+    renderFilePreview();
+    clearUploadError();
+    const fileInput = document.getElementById('documentFiles');
+    if (fileInput) fileInput.value = '';
+}
+
+/* =========================================================
    CLAIM SUBMISSION
    ========================================================= */
 document.getElementById('claimForm').addEventListener('submit', async function (e) {
@@ -162,7 +364,7 @@ document.getElementById('claimForm').addEventListener('submit', async function (
         documentReference: document.getElementById('documentReference').value.trim()
     };
 
-    // --- Client-side validation (convenience layer) ---
+    // --- Client-side validation ---
     if (!validateClaimForm(payload)) {
         showMsg('submitResult', 'Please fix the highlighted fields before submitting.', 'error');
         return;
@@ -172,17 +374,43 @@ document.getElementById('claimForm').addEventListener('submit', async function (
     submitBtn.textContent = 'Submitting...';
 
     try {
-        const response = await fetch(`${API_BASE}/claims`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        let response;
+
+        if (selectedFiles.length > 0) {
+            // Multipart FormData submission when supporting documents are attached
+            const formData = new FormData();
+            formData.append('policyNumber', payload.policyNumber);
+            formData.append('customerName', payload.customerName);
+            formData.append('destination', payload.destination);
+            formData.append('travelDate', payload.travelDate);
+            formData.append('claimType', payload.claimType);
+            formData.append('claimAmount', payload.claimAmount);
+            formData.append('description', payload.description);
+            formData.append('documentReference', payload.documentReference);
+
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            response = await fetch(`${API_BASE}/claims`, {
+                method: 'POST',
+                body: formData
+            });
+        } else {
+            // Standard JSON submission when no documents are attached
+            response = await fetch(`${API_BASE}/claims`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
 
         const data = await response.json();
 
         if (response.status === 201) {
             // Success — show the generated Claim ID
             clearAllFieldErrors();
+            clearSelectedFiles();
             document.getElementById('generatedClaimId').textContent = data.claimId;
             document.getElementById('claimIdBox').style.display = 'block';
             document.getElementById('claimForm').reset();
@@ -194,7 +422,6 @@ document.getElementById('claimForm').addEventListener('submit', async function (
             if (data.fieldErrors) {
                 for (const [field, msg] of Object.entries(data.fieldErrors)) {
                     errorHtml += `<li><strong>${field}:</strong> ${msg}</li>`;
-                    // Also highlight inline on the field if it exists in the form
                     showFieldError(field, msg);
                 }
             } else {
@@ -211,7 +438,7 @@ document.getElementById('claimForm').addEventListener('submit', async function (
         console.error('Submit error:', err);
     } finally {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = 'Submit Claim';
+        submitBtn.innerHTML = '🚀 Submit Claim';
     }
 });
 
@@ -253,7 +480,7 @@ async function trackClaim() {
         console.error('Track error:', err);
     } finally {
         trackBtn.disabled = false;
-        trackBtn.textContent = 'Search';
+        trackBtn.textContent = '🔍 Search';
     }
 }
 
@@ -266,11 +493,14 @@ function populateClaimDetails(claim) {
     document.getElementById('d-destination').textContent      = claim.destination;
     document.getElementById('d-travelDate').textContent       = claim.travelDate;
     document.getElementById('d-claimType').textContent        = claim.claimType;
-    document.getElementById('d-claimAmount').textContent      = 'Rs. ' + Number(claim.claimAmount).toLocaleString('en-IN');
+    document.getElementById('d-claimAmount').textContent      = '₹ ' + Number(claim.claimAmount).toLocaleString('en-IN');
     document.getElementById('d-description').textContent      = claim.description;
     document.getElementById('d-documentReference').textContent= claim.documentReference;
     document.getElementById('d-createdAt').textContent        = formatDateTime(claim.createdAt);
     document.getElementById('d-updatedAt').textContent        = formatDateTime(claim.updatedAt);
+
+    // Load and render uploaded documents
+    renderCustomerDocuments(claim);
 
     // Show rejection reason only if REJECTED
     const rejBox = document.getElementById('d-rejectionBox');
@@ -282,7 +512,81 @@ function populateClaimDetails(claim) {
     }
 }
 
+/* ---------- Render Clickable Uploaded Documents in Tracking ---------- */
+async function renderCustomerDocuments(claim) {
+    const uploadedBox = document.getElementById('d-uploadedFilesBox');
+    const container = document.getElementById('d-uploadedFiles');
+    if (!uploadedBox || !container) return;
+
+    container.innerHTML = '<span style="color:#6c757d;font-style:italic;font-size:0.85rem;">Loading documents...</span>';
+    uploadedBox.style.display = 'block';
+
+    try {
+        const response = await fetch(`${API_BASE}/documents/claim/${claim.claimId}`);
+        if (response.ok) {
+            const docs = await response.json();
+            if (Array.isArray(docs) && docs.length > 0) {
+                container.innerHTML = `
+                    <div class="doc-card-list">
+                        ${docs.map(doc => `
+                            <div class="doc-card-item">
+                                <div class="doc-card-left">
+                                    <span class="doc-card-icon">${getFileIcon(doc.fileName)}</span>
+                                    <a href="${doc.viewUrl}" target="_blank" rel="noopener noreferrer" class="doc-card-filename" title="Open ${escapeHtml(doc.fileName)} in new tab">
+                                        ${escapeHtml(doc.fileName)}
+                                    </a>
+                                    <span class="doc-card-size">${formatFileSize(doc.fileSize)}</span>
+                                </div>
+                                <div class="doc-card-actions">
+                                    <a href="${doc.viewUrl}" target="_blank" rel="noopener noreferrer" class="btn-doc-action btn-doc-view" title="View ${escapeHtml(doc.fileName)} in new tab">
+                                        👁️ View
+                                    </a>
+                                    <a href="${doc.downloadUrl}" class="btn-doc-action btn-doc-download" download="${escapeHtml(doc.fileName)}" title="Download ${escapeHtml(doc.fileName)}">
+                                        📥 Download
+                                    </a>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                return;
+            }
+        }
+    } catch (err) {
+        console.warn('Could not fetch structured documents for claim ' + claim.claimId, err);
+    }
+
+    // Fallback: If claim has uploadedFiles text but no binary records
+    if (claim.uploadedFiles && claim.uploadedFiles.trim() !== '') {
+        const names = claim.uploadedFiles.split(',').map(s => s.trim()).filter(Boolean);
+        container.innerHTML = `
+            <div class="doc-card-list">
+                ${names.map(name => `
+                    <div class="doc-card-item">
+                        <div class="doc-card-left">
+                            <span class="doc-card-icon">${getFileIcon(name)}</span>
+                            <span class="doc-card-filename" style="cursor:default;color:#555;">${escapeHtml(name)}</span>
+                        </div>
+                        <span class="doc-card-size">Filename record</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        uploadedBox.style.display = 'none';
+        container.innerHTML = '';
+    }
+}
+
+
 /* Allow pressing Enter in the track input */
 document.getElementById('trackClaimId').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') trackClaim();
 });
+
+/* Initialize upload zone */
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initUploadZone);
+} else {
+    initUploadZone();
+}

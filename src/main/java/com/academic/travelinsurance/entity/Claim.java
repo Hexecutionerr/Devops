@@ -60,6 +60,10 @@ public class Claim {
     @Column(length = 500)
     private String rejectionReason;
 
+    // Names of supporting documents uploaded by customer
+    @Column(length = 2000)
+    private String uploadedFiles;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -117,6 +121,9 @@ public class Claim {
 
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+
+    public String getUploadedFiles() { return uploadedFiles; }
+    public void setUploadedFiles(String uploadedFiles) { this.uploadedFiles = uploadedFiles; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

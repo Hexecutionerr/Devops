@@ -46,3 +46,4 @@ logs/
 *.swp
 .env
 local.properties
+uploads/

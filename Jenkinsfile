@@ -20,6 +20,11 @@ pipeline {
             steps {
                 bat 'call mvnw.cmd test'
             }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
         }
         stage('Package') {
             steps {
