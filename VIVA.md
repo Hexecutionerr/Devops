@@ -5,7 +5,7 @@
   Author:        Hasnain Khan (Roll No: 23102A0075)
   Subject:       DevOps (Semester VII, Computer Engineering)
   Faculty Guide: Dr. Snehal Andhare
-  College:       Vidyalankar ins College of Engineering and Technology
+  College:       Vidyalankar Institute of Technology (VIT), Mumbai
 
 ================================================================================
 [+] IS GUIDE KA PURPOSE KYA HAI?

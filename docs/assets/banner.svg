@@ -164,7 +164,7 @@
     <!-- Metric 4: Author Tag -->
     <g transform="translate(420, 0)">
       <text x="0" y="-4" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="14" font-weight="700" fill="#f1f5f9">Hasnain Khan</text>
-      <text x="0" y="14" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="10" font-weight="600" fill="#64748b" letter-spacing="1">ROLL: 23102A0075 • TCET</text>
+      <text x="0" y="14" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="10" font-weight="600" fill="#64748b" letter-spacing="1">ROLL: 23102A0075 • VIT</text>
     </g>
   </g>
 </svg>

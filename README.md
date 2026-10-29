@@ -326,7 +326,7 @@ Devops/
 - **Roll Number:** `23102A0075`
 - **Department:** Department of Computer Engineering
 - **Program:** B.E. Computer Engineering (Semester VII)
-- **Institution:** Thakur College of Engineering and Technology (TCET), Mumbai
+- **Institution:** Vidyalankar Institute of Technology (VIT), Mumbai
 - **Course:** DevOps Lab (Academic Year 2026–27)
 - **Subject Guide:** Dr. Snehal Andhare
 
