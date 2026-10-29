@@ -74,29 +74,29 @@ Beyond application development, this project establishes a complete **DevOps Lif
 ```mermaid
 flowchart TD
     subgraph ClientLayer ["1. Presentation Layer"]
-        CP["Customer Portal\n(index.html / customer.js)"]
-        RP["Reviewer Portal\n(reviewer.html / reviewer.js)"]
+        CP["Customer Portal<br/>(index.html / customer.js)"]
+        RP["Reviewer Portal<br/>(reviewer.html / reviewer.js)"]
     end
 
-    subgraph ServiceLayer ["2. Application Tier (Spring Boot 3.3.4)"]
-        CC["ClaimController\n(/api/claims)"]
-        RC["ReviewerController\n(/api/reviewer)"]
-        DC["DocumentController\n(/api/documents)"]
-        CS["ClaimService\n(Business Logic & DTO Mapping)"]
-        DS["DocumentService\n(File Sanitization & Storage)"]
-        GEH["GlobalExceptionHandler\n(@RestControllerAdvice)"]
+    subgraph ServiceLayer ["2. Application Tier — Spring Boot 3.3.4"]
+        CC["ClaimController<br/>/api/claims"]
+        RC["ReviewerController<br/>/api/reviewer"]
+        DC["DocumentController<br/>/api/documents"]
+        CS["ClaimService<br/>Business Logic & DTO Mapping"]
+        DS["DocumentService<br/>File Sanitization & Storage"]
+        GEH["GlobalExceptionHandler<br/>RestControllerAdvice"]
     end
 
     subgraph DataLayer ["3. Persistence Tier"]
-        CR["ClaimRepository\n(Spring Data JPA)"]
-        CDR["ClaimDocumentRepository\n(Spring Data JPA)"]
-        H2[("H2 In-Memory DB\n(jdbc:h2:mem:claimdb)")]
-        FS[("File Storage\n(uploads/claimId/)")]
+        CR["ClaimRepository<br/>Spring Data JPA"]
+        CDR["ClaimDocumentRepository<br/>Spring Data JPA"]
+        H2[("H2 In-Memory Database<br/>jdbc:h2:mem:claimdb")]
+        FS[("File Storage System<br/>uploads/claimId/")]
     end
 
-    CP -->|POST /api/claims / GET status| CC
-    RP -->|GET pending / PUT approve| RC
-    RP -->|GET /api/documents/{id}/view| DC
+    CP -->|"POST /api/claims / GET status"| CC
+    RP -->|"GET pending / PUT approve"| RC
+    RP -->|"GET /api/documents/:id/view"| DC
 
     CC --> CS
     RC --> CS
@@ -110,6 +110,12 @@ flowchart TD
     CR --> H2
     CDR --> H2
 ```
+
+<div align="center">
+  <img src="docs/screenshots/task03_api_architecture.png" alt="Travel Insurance System Architecture Diagram" width="90%"/>
+  <br/>
+  <sub><i>Figure: Comprehensive 3-Tier Enterprise Architecture &amp; REST Interaction Model</i></sub>
+</div>
 
 ### 🔄 End-to-End DevOps Continuous Delivery Flow
 
